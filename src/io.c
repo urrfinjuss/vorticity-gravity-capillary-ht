@@ -165,7 +165,7 @@ void debug_write(__float128 *in, char* str) {
 void debug_write_hmore(work_ptr wrk, __float128 *in, char* str) {
   fh_out = fopen(str, "w");
   for (int j = 0; j < n_even; j++) {
-    fprintf(fh_out, "%10d\t%38.31Qe\t%38.31Qe\n", j, wrk->u[j], in[j]);
+    fprintf(fh_out, "%10d\t%38.31Qe\t%38.31Qe\n", j, wrk->u[j]+crealq(wrk->Z[j]), in[j]);
   }
   fclose(fh_out);
 }
@@ -173,7 +173,7 @@ void debug_write_hmore(work_ptr wrk, __float128 *in, char* str) {
 void debug_write_cmplx_hmore(work_ptr wrk, fftwq_complex *in, char* str) {
   fh_out = fopen(str, "w");
   for (int j = 0; j < n_even; j++) {
-    fprintf(fh_out, "%10d\t%38.31Qe\t%38.31Qe\t%38.31Qe\n", j, wrk->u[j], crealq(in[j]), cimagq(in[j]));
+    fprintf(fh_out, "%10d\t%38.31Qe\t%38.31Qe\t%38.31Qe\n", j, wrk->u[j]+crealq(wrk->Z[j]), crealq(in[j]), cimagq(in[j]));
   }
   fclose(fh_out);
 }

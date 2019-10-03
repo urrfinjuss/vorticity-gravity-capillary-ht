@@ -259,9 +259,9 @@ void get_initial_guess(work_ptr wrk, fftwq_complex *in, __float128 *q_cr) {
   int 		Jmax = 0;
   __float128 	Amax = 0.Q;
   
-  for (int j = 0; j < (n_even-1)/2; j++) {
+  for (int j = 0; j < (n_even-0); j++) {
     if (Amax < cimagq( clogq( wrk->du[j] + in[j]))) {
-      Amax = tanq(cimagq( clogq( wrk->du[j] + in[j])));
+      Amax = cimagq( clogq( wrk->du[j] + in[j]));
       Jmax = j;
     }
   }
@@ -270,39 +270,38 @@ void get_initial_guess(work_ptr wrk, fftwq_complex *in, __float128 *q_cr) {
 }
 */
 
-void get_initial_guess(work_ptr wrk, fftwq_complex *in, __float128 *q_cr) {
+
+void get_initial_guess(work_ptr wrk, __float128 *q_cr) {
   int 		Jmax = 0;
   __float128 	Amax = 0.Q;
 
-  
-  debug_write_cmplx_hmore(wrk, wrk->Z, "half_Z.txt"); 
-  for (int j = 0; j < n_full; j++) {
-    wrk->dZ[j] = 1.0IQ*j*wrk->Zk[j]*overN;
-    if (j > n_even) wrk->dZ[j] = 1.0IQ*(j-n_full/2)*wrk->Zk[j]*overN;
+  debug_write_cmplx_hmore(wrk, wrk->Z, "half_Z.txt");  // wrk->Z has Z-tilde
+  wrk->dZ[0] = 0.Q;
+  for (int j = 1; j < n_full/2; j++) {
+    wrk->dZ[j] = 1.0IQ*j*wrk->Zk[j];
+    wrk->dZ[n_full-j] = -1.0IQ*j*wrk->Zk[n_full-j];
   }
-  fft_cmplx(wrk->dZ, wrk->dZ, BACKWARD);
-  //for (int j = 0; j < n_even; j++) wrk->dZ[j] += wrk->du[j];
-  //debug_write_cmplx_hmore(wrk, wrk->dZ, "half_dZ.txt"); 
 
+  fft_cmplx(wrk->dZ, wrk->dZ, BACKWARD);
+  fftwq_complex ctmp;
   for (int j = 0; j < n_even; j++) {
-    wrk->EtaX[j] = cimagq( clogq(0.Q*wrk->du[j]+wrk->dZ[j]))*180.0Q/pi;
-    wrk->EtaX[j] = atan2q( crealq(wrk->du[j]+wrk->dZ[j]), 1.Q);
+    ctmp = wrk->dZ[j] + wrk->du[j];
+    wrk->EtaX[j] = cimagq(clogq(ctmp))*180.0Q/pi;
   }
-  //wrk->EtaX[n_even-1] = -180.Q;
   debug_write_hmore(wrk, wrk->EtaX, "half_EtaX.txt"); 
 
-  exit(0);
-
-
-
-  for (int j = 0; j < (n_even-1)/2; j++) {
-    if (Amax < cimagq( clogq( wrk->du[j] + in[j]))) {
-      Amax = cimagq( clogq( wrk->du[j] + in[j]));
+  /* not the global Max, but rather the first max! */
+  for (int j = n_even-1; j > 0; j--) {
+    if (Amax < cimagq( clogq( wrk->du[j] + wrk->dZ[j]))) {
+      Amax = cimagq( clogq( wrk->du[j] + wrk->dZ[j]));
       Jmax = j;
     }
+    if (Amax > cimagq( clogq( wrk->du[j] + wrk->dZ[j]))) break;
   }
-  printf("Crude: %.12Qe\t%.12Qe\n", Amax, 1.0Q*Jmax);
+  printf("Local Max at x = %.32Qe\tEtaX = %.32Qe\n", wrk->u[Jmax]+crealq(wrk->Z[Jmax]), Amax*180.0Q/pi);
+  //printf("Crude: %.12Qe\t%.12Qe\n", Amax, 1.0Q*Jmax);
   *q_cr = pi*(2.Q*Jmax*overN);
+  //*q_cr = 1.0Q*Jmax;
 }
 
 
@@ -327,13 +326,16 @@ void seek_max_angle(params_ptr par, work_ptr wrk) {
     d2Z[n_full-j] = -1.Q*j*j*wrk->Zk[n_full-j];
     d3Z[n_full-j] =  1.IQ*j*j*j*wrk->Zk[n_full-j];
   }
-  fft_cmplx(d1Z, dZ, BACKWARD);
   /*
+  fft_cmplx(d1Z, dZ, BACKWARD);
+  fft_cmplx(d2Z, d2Z, BACKWARD);
+  fft_cmplx(d3Z, d3Z, BACKWARD);
   fft_cmplx(d1Z, d1Z, BACKWARD);
   fft_cmplx(d2Z, d2Z, BACKWARD);
   fft_cmplx(d3Z, d3Z, BACKWARD);
   */
-  
+ 
+  /*
   debug_write_cmplx(wrk, dZ, "dz.txt"); 
   for (int j = 0; j < n_even; j++) {
     dZ[j] = wrk->u[j];
@@ -343,6 +345,7 @@ void seek_max_angle(params_ptr par, work_ptr wrk) {
     dZ[j] = wrk->du[j];
   }
   debug_write_cmplx(wrk, dZ, "du.txt");
+  */
   //debug_write_cmplx(wrk, d2Z, "d2Z.txt"); 
   //debug_write_cmplx(wrk, d3Z, "d3Z.txt"); 
   
@@ -354,9 +357,10 @@ void seek_max_angle(params_ptr par, work_ptr wrk) {
   __float128 	q_tmp = 0.6Q;
 
   /* Get a crude estimate first */
-  get_initial_guess(wrk, dZ, &q_tmp);
+  get_initial_guess(wrk, &q_tmp);
   //if (q_tmp > 0) q_tmp += -pi;
   printf("Crude Estimate:\tq0 = %.12Qe\n", q_tmp);
+  //exit(0);
 
   mp_sn_cn_dn_K_Piq( &sn, &cn, &dn, &K, &q_tmp, &(par->L));
   d1u = 2.Q*(K/pi)*dn;
@@ -364,10 +368,10 @@ void seek_max_angle(params_ptr par, work_ptr wrk) {
   d1z = complex_interp(d1Z, q_tmp - pi); 
   d2z = complex_interp(d2Z, q_tmp - pi); 
   f  = cimagq((d2u + d2z)/(d1u + d1z));
-   
-  printf("at %.12Qe\tAngle = %.12Qe\n", q_tmp-pi, cimagq(clogq(d1u+d1z))*180.Q/pi);
-  exit(0);
-
+  
+  /**/
+  printf("at %.12Qe\tPhase = %.12Qe\tdPhase = %.12Qe\n", q_tmp, cimagq(clogq(d1u+d1z)), f);
+  /**/
 
   int iter = 0;
   while (1) {
